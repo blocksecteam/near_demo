@@ -121,7 +121,7 @@ const contractMethods3 = {
 
 async function initTest() {
   // attacker.test.near
-  const contract1 = await fs.readFile("/Volumes/Fast_SSD/Blog5/attack_contract/target/wasm32-unknown-unknown/release/malicious_contract.wasm");
+  const contract1 = await fs.readFile("target/wasm32-unknown-unknown/release/malicious_contract.wasm");
   const _contractAccount1 = await masterAccount.createAndDeployContract(
     config.contractAccount1,
     pubKey,
@@ -130,7 +130,7 @@ async function initTest() {
   );
 
   // victim.test.near
-  const contract2 = await fs.readFile("/Volumes/Fast_SSD/Blog5/victim_contract/target/wasm32-unknown-unknown/release/victim_contract.wasm");
+  const contract2 = await fs.readFile("../victim_contract/target/wasm32-unknown-unknown/release/victim_contract.wasm");
   const _contractAccount2 = await masterAccount.createAndDeployContract(
     config.contractAccount2,
     pubKey,
@@ -140,7 +140,7 @@ async function initTest() {
 
 
   // ft_token.test.near
-  const contract3 = await fs.readFile("/Volumes/Fast_SSD/Blog5/ft_contract/target/wasm32-unknown-unknown/release/ft_token.wasm");
+  const contract3 = await fs.readFile("../ft_contract/target/wasm32-unknown-unknown/release/ft_token.wasm");
     const _contractAccount3 = await masterAccount.createAndDeployContract(
       config.contractAccount3,
       pubKey,

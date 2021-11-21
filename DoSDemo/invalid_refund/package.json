@@ -1,0 +1,15 @@
+{
+  "name": "statusmessage",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Dual_Contracts.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bn.js": "^5.2.0",
+    "near-api-js": "^0.43.1"
+  }
+}

@@ -1,12 +1,11 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::*;
 use near_sdk::{
-    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, PromiseOrValue,
+    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, PromiseOrValue,PromiseResult
 };
 
 const FTTOKEN: &str = "ft_token.test.near";
 const DEFAULT_ACCOUNT: &str = "default.test.near";
-const ERR_REFUND: &str = "Cannot Refund";
 const GAS_FOR_SINGLE_CALL: u64 = 20000000000000;
 
 #[near_bindgen]
@@ -17,7 +16,6 @@ pub struct Contract {
     pub bid_price: UnorderedMap<AccountId, Balance>,
     pub current_leader: AccountId,
     pub highest_bid: u128,
-    pub refund: bool,
 }
 
 impl Default for Contract {
@@ -27,7 +25,6 @@ impl Default for Contract {
             bid_price: UnorderedMap::new(StorageKey::BidPrice),
             current_leader: DEFAULT_ACCOUNT.to_string(),
             highest_bid: 0,
-            refund: false,
         }
     }
 }
@@ -42,6 +39,17 @@ pub trait ExtFtToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: u128);
     fn account_exist(&self, account_id: AccountId);
 }
+
+#[ext_contract(ext_self)]
+pub trait FTResolver {
+    fn account_resolve(
+        &mut self,
+        sender_id: AccountId,
+        amount: u128
+    ) -> bool;
+}
+
+
 
 #[near_bindgen]
 impl Contract {
@@ -60,9 +68,24 @@ impl Contract {
 
     pub fn bid(&mut self, sender_id: AccountId, amount: u128) -> PromiseOrValue<u128> {
         assert!(amount > self.highest_bid);
-        self.refund_exe();
-        self.current_leader = sender_id;
-        self.highest_bid = amount;
+
+        if self.current_leader == DEFAULT_ACCOUNT {
+            self.current_leader = sender_id;
+            self.highest_bid = amount;
+        } else {
+            ext_ft_token::account_exist(
+                self.current_leader.clone(),
+                &FTTOKEN,
+                0,
+                env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 4,
+            ).then(ext_self::account_resolve(
+                sender_id,
+                amount,
+                &env::current_account_id(),
+                0,
+                GAS_FOR_SINGLE_CALL * 3, 
+            ));
+        }
         log!(
             "current_leader: {} highest_bid: {}",
             self.current_leader,
@@ -71,42 +94,41 @@ impl Contract {
         PromiseOrValue::Value(0)
     }
 
-    pub(crate) fn refund_exe(&mut self) {
-        if self.current_leader == DEFAULT_ACCOUNT {
-            return;
-        } else {
-            ext_ft_token::account_exist(
-                self.current_leader.clone(),
-                &FTTOKEN,
-                0,
-                env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 3,
-            );
-
-            assert!(self.refund, "{}", ERR_REFUND);
-            ext_ft_token::ft_transfer(
-                self.current_leader.clone(),
-                self.highest_bid,
-                &FTTOKEN,
-                0,
-                GAS_FOR_SINGLE_CALL * 2,
-            );
-        }
-    }
-
-    // 直接调用没有意义
-    pub fn abort_refund(&mut self) {
-        self.refund = false;
-    }
-
-    pub fn promise_refund(&mut self) {
-        self.refund = true;
-    }
-
     pub fn view_current_leader(&mut self) -> AccountId {
         self.current_leader.clone()
     }
 
     pub fn view_highest_bid(&mut self) -> u128 {
         self.highest_bid
+    }
+
+    #[private]
+    pub fn account_resolve(&mut self,sender_id: AccountId,amount: u128) {
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {
+                    // 退回上任出价最高者的token
+                    ext_ft_token::ft_transfer(
+                        self.current_leader.clone(),
+                        self.highest_bid,
+                        &FTTOKEN,
+                        0,
+                        GAS_FOR_SINGLE_CALL * 2,
+                    );
+                    self.current_leader = sender_id;
+                    self.highest_bid = amount;
+            }
+            PromiseResult::Failed => {
+                // 退回当前出价最高者的token
+                ext_ft_token::ft_transfer(
+                    sender_id.clone(),
+                    amount,
+                    &FTTOKEN,
+                    0,
+                    GAS_FOR_SINGLE_CALL * 2,
+                );
+                log!("Return Back Now");
+            }
+        };
     }
 }

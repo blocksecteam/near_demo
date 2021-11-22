@@ -1,12 +1,13 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::*;
 use near_sdk::{
-    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, Promise,
+    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, PromiseOrValue,Promise
 };
 
 const OWNER: &str = "ft_token_owner.test.near";
-const BIDCONTRACT: &str = "bid_contract.test.near";
 const GAS_FOR_SINGLE_CALL: u64 = 20000000000000;
+const ERR_REFUND: &str = "Cannot Refund";
+
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -67,19 +68,14 @@ impl Contract {
         self.internal_unwrap_balance_of(&account_id)
     }
 
-    pub fn account_exist(&self, account_id: AccountId) -> Promise {
+    pub fn account_exist(&self, account_id: AccountId) -> PromiseOrValue<bool> {
         if self.accounts.get(&account_id).is_none() {
-            ext_fungible_token_receiver::abort_refund(
-                &BIDCONTRACT,
-                0,
-                env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 3,
-            )
+            log!("Account not found");
+            assert!(false, "{}",ERR_REFUND);
+            PromiseOrValue::Value(false)
         } else {
-            ext_fungible_token_receiver::promise_refund(
-                &BIDCONTRACT,
-                0,
-                env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 3,
-            )
+            log!("Promise_refund");
+            PromiseOrValue::Value(true)
         }
     }
 

@@ -298,7 +298,8 @@ async function test_dos() {
   user_message = await user0UseContract2.ft_transfer_call({
     args: {
       receiver_id: "bid_contract.test.near",
-      amount: 1000
+      amount: 1000,
+      msg: "bid"
     },
     gas: "300000000000000",
   });
@@ -329,14 +330,11 @@ async function test_dos() {
   });
   console.log("highest_bid: " + user_message)
 
-
-
-
-
   user_message = await user1UseContract2.ft_transfer_call({
     args: {
       receiver_id: "bid_contract.test.near",
-      amount: 2000
+      amount: 2000,
+      msg: "bid"
     },
     gas: "300000000000000",
   });

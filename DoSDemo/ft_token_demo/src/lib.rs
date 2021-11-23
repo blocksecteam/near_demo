@@ -30,9 +30,7 @@ impl Default for Contract {
 
 #[ext_contract(ext_fungible_token_receiver)]
 pub trait ExtBidContract {
-    fn bid(&mut self, sender_id: AccountId, amount: u128);
-    fn abort_refund(&self);
-    fn promise_refund(&self);
+    fn ft_on_transfer(&mut self, sender_id: AccountId, amount: u128, msg:String);
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -85,14 +83,15 @@ impl Contract {
         self.internal_transfer(&sender_id, &receiver_id, amount);
     }
 
-    pub fn ft_transfer_call(&mut self, receiver_id: AccountId, amount: u128) -> Promise {
+    pub fn ft_transfer_call(&mut self, receiver_id: AccountId, amount: u128, msg: String) -> Promise {
         let sender_id = env::predecessor_account_id();
         let amount: Balance = amount.into();
         self.internal_transfer(&sender_id, &receiver_id, amount);
         // Initiating receiver's call and the callback
-        ext_fungible_token_receiver::bid(
+        ext_fungible_token_receiver::ft_on_transfer(
             sender_id.clone(),
             amount.into(),
+            msg,
             &receiver_id.clone(),
             0,
             env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 2,

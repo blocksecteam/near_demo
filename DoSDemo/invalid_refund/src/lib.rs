@@ -1,7 +1,8 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::*;
 use near_sdk::{
-    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, PromiseOrValue,PromiseResult
+    env, ext_contract, log, near_bindgen, AccountId, Balance, BorshStorageKey, PromiseOrValue,
+    PromiseResult,
 };
 
 const FTTOKEN: &str = "ft_token.test.near";
@@ -42,14 +43,8 @@ pub trait ExtFtToken {
 
 #[ext_contract(ext_self)]
 pub trait FTResolver {
-    fn account_resolve(
-        &mut self,
-        sender_id: AccountId,
-        amount: u128
-    ) -> bool;
+    fn account_resolve(&mut self, sender_id: AccountId, amount: u128) -> bool;
 }
-
-
 
 #[near_bindgen]
 impl Contract {
@@ -66,7 +61,19 @@ impl Contract {
         log!("Registered account {}", env::predecessor_account_id());
     }
 
-    pub fn bid(&mut self, sender_id: AccountId, amount: u128) -> PromiseOrValue<u128> {
+    pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: u128, msg: String) -> PromiseOrValue<u128>{
+        assert_eq!(
+            &env::predecessor_account_id(),
+            &FTTOKEN,
+            "Only supports the one fungible token contract"
+        );
+        match msg.as_str() {
+            "bid" => self.bid(sender_id,amount),
+            _ => PromiseOrValue::Value(1)
+        }
+    }
+
+    pub(crate) fn bid(&mut self, sender_id: AccountId, amount: u128) -> PromiseOrValue<u128> {
         assert!(amount > self.highest_bid);
 
         if self.current_leader == DEFAULT_ACCOUNT {
@@ -78,19 +85,15 @@ impl Contract {
                 &FTTOKEN,
                 0,
                 env::prepaid_gas() - GAS_FOR_SINGLE_CALL * 4,
-            ).then(ext_self::account_resolve(
+            )
+            .then(ext_self::account_resolve(
                 sender_id,
                 amount,
                 &env::current_account_id(),
                 0,
-                GAS_FOR_SINGLE_CALL * 3, 
+                GAS_FOR_SINGLE_CALL * 3,
             ));
         }
-        log!(
-            "current_leader: {} highest_bid: {}",
-            self.current_leader,
-            self.highest_bid
-        );
         PromiseOrValue::Value(0)
     }
 
@@ -103,20 +106,25 @@ impl Contract {
     }
 
     #[private]
-    pub fn account_resolve(&mut self,sender_id: AccountId,amount: u128) {
+    pub fn account_resolve(&mut self, sender_id: AccountId, amount: u128) {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                    // 退回上任出价最高者的token
-                    ext_ft_token::ft_transfer(
-                        self.current_leader.clone(),
-                        self.highest_bid,
-                        &FTTOKEN,
-                        0,
-                        GAS_FOR_SINGLE_CALL * 2,
-                    );
-                    self.current_leader = sender_id;
-                    self.highest_bid = amount;
+                // 退回上任出价最高者的token
+                ext_ft_token::ft_transfer(
+                    self.current_leader.clone(),
+                    self.highest_bid,
+                    &FTTOKEN,
+                    0,
+                    GAS_FOR_SINGLE_CALL * 2,
+                );
+                self.current_leader = sender_id;
+                self.highest_bid = amount;
+                log!(
+                    "current_leader: {} highest_bid: {}",
+                    self.current_leader,
+                    self.highest_bid
+                );
             }
             PromiseResult::Failed => {
                 // 退回当前出价最高者的token
@@ -127,7 +135,7 @@ impl Contract {
                     0,
                     GAS_FOR_SINGLE_CALL * 2,
                 );
-                log!("Return Back Now");
+                log!("Cannot bid, return back now");
             }
         };
     }

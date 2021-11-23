@@ -193,7 +193,7 @@ async function test_dos() {
     args: {
       account_id: "ft_token_owner.test.near"
     },
-    gas: "30000000000000000",
+    gas: "300000000000000",
   });
 
 
